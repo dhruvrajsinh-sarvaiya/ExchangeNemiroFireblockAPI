@@ -1,0 +1,37 @@
+{
+  "name": "blockchainapi",
+  "version": "1.0.0",
+  "description": "blockchain api ",
+  "main": "app.js",
+  "scripts": {
+    "start:watch": "nodemon ./bin/www --ignore public/",
+    "start:dev": "node ./bin/www",
+    "debug": "node debug ./bin/www",
+    "start": "nodemon ./bin/www",
+    "start:production": "NODE_ENV=production node ./bin/www"
+  },
+  "author": "espay",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.1.1",
+    "dateformat": "^4.5.1",
+    "ddos": "^0.2.1",
+    "dot-object": "^2.1.4",
+    "express": "^4.17.1",
+    "express-validator": "^6.12.1",
+    "fireblocks-sdk": "^1.6.4",
+    "helmet": "^4.6.0",
+    "jsonwebtoken": "^8.5.1",
+    "lodash": "^4.17.21",
+    "mkdirp": "^1.0.4",
+    "morgan": "^1.10.0",
+    "mysql": "^2.18.1",
+    "nodemon": "^2.0.12",
+    "randomstring": "^1.2.1",
+    "ua-parser-js": "^0.7.28",
+    "url": "^0.11.0",
+    "validator": "^13.6.0"
+  }
+}
