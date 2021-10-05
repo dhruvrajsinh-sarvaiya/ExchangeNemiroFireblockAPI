@@ -4,6 +4,10 @@ const jwtHelper = require('../helper/JWT'),
     MakeRequest = require('../helper/apiHelper').MakeRequest,
     getMapping = require('../helper/apiHelper').getMapping,
     responseCode = require('../helper/responseCodes'),
+    requestLog = require('../helper/logHelper').requestLog,
+    responseLog = require('../helper/logHelper').responseLog,
+    providerRequestLog = require('../helper/logHelper').providerRequestLog,
+    errorLog = require('../helper/logHelper').errorLog,
     dot = require("dot-object"),
     mySql = require('../helper/apiHelper').query,
     path = require('path'),
@@ -56,7 +60,7 @@ module.exports = function (app) {
 
             })
         } catch (e) {
-            console.log(e)
+            errorLog({},e.stack);
             let response = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
             response.status(500).json(response).end();
         }
@@ -73,6 +77,9 @@ module.exports = function (app) {
 
         const apiSecret = fs.readFileSync(path.resolve(requestData.body.ENCPVTKey), "utf8");
         let userProvider = new provider[0][requestData.body.providerName](apiSecret, requestData.body.ENCPUBKey);
+
+        //Request log
+        requestLog(requestData);
 
         findMethodDetails(requestData, async function (err, result, methodDetails) {
 
@@ -109,12 +116,21 @@ module.exports = function (app) {
                                             });
                                         }
 
+                                        //Provider requestlog
+                                        providerRequestLog(requestData.providerName,methodName,methodRequest);  
+
                                         userProvider[methodName](methodRequest,function (err, res) {
                                             if (!err) {
                                                 userProvider = null;
+
+                                                //Response log
+                                                responseLog(requestData,res);
                                                 return response.status(200).json(res).end();
                                             } else {
                                                 userProvider = null;
+
+                                                //Error log
+                                                errorLog(requestData,err);
                                                 return response.status(200).json({msg: err.toString()}).end();
                                             }
                                         })
@@ -149,13 +165,21 @@ module.exports = function (app) {
                                         MakeRequest(requestMapping.headersParam[key], key, data, options.headers)
                                     });
                                 }
+                                //Provider requestlog
+                                providerRequestLog(requestData.providerName,methodName,methodRequest);
 
                                 userProvider[methodName](methodRequest,function (err, res) {
                                     if (!err) {
                                         userProvider = null;
+
+                                        //Response log
+                                        responseLog(requestData,res);
                                         return response.status(200).json(res).end();
                                     } else {
                                         userProvider = null;
+
+                                        //Error log
+                                        errorLog(requestData,err);
                                         return response.status(200).json({msg: err.toString()}).end();
                                     }
                                 })
@@ -181,8 +205,9 @@ module.exports = function (app) {
         try {
 
             let body = req.body;
+            let query = "SELECT id,providerId,siteAccessToken,sitename from siteMaster where id = " + body.site_id + " AND sitename = '" + body.SiteName + "' AND status = 1";
             // find site details from site id and site name
-            mySql("SELECT id,providerId,siteAccessToken,sitename from siteMaster where id = " + body.site_id + " AND sitename = '" + body.SiteName + "' AND status = 1", async function (err, result) {
+            mySql(query, async function (err, result) {
                 if (!err) {
                     // generate token if site found
                     let data = {
@@ -200,17 +225,20 @@ module.exports = function (app) {
                             dot.str('data.token', token.token, response)
                             res.status(200).json(response).end();
 
-                        } else if (!error && token.status === 0) {
+                        } else if (!error && token.status === 1) {
+                            errorLog(data,token.err);
                             response = await CodeHandler.getFailedResponseCode("TOKEN_GENERATION_FAILED");
                             res.status(200).json(response).end();
                         }
                     });
                 } else {
+                    errorLog({"query":query},err.stack);
                     response = await CodeHandler.getFailedResponseCode("TOKEN_GENERATION_FAILED");
                     res.status(200).json(response).end();
                 }
             })
         } catch (e) {
+            errorLog({},e.stack);
             response = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
             res.status(200).json(response).end();
         }

@@ -1,6 +1,6 @@
 const pool = require("../config/keys").pool;
 const parser = require("ua-parser-js"),
-    errorLog = require('./logHelper').socketErrorLog;
+      mysqlErrorLog = require('./logHelper').mysqlErrorLog;
 let dot = require('dot-object');
 query = function (statement, callback) {
     try {
@@ -11,12 +11,12 @@ query = function (statement, callback) {
                     connection.release();
                 }
                 // write the error log
-                errorLog({code: err.code, name: err.toString(), message: err.message}, 'Mysql Exception');
+                mysqlErrorLog({code: err.code, name: err.toString(), message: err.message}, 'Mysql Exception');
                 callback(err, null);
             } else {
                 connection.on('error', function (err) {
                     // write the error log
-                    errorLog({code: err.code, name: err.toString(), message: err.message}, 'Mysql Exception');
+                    mysqlErrorLog({code: err.code, name: err.toString(), message: err.message}, 'Mysql Exception');
                     return err;
                 });
 
@@ -31,15 +31,15 @@ query = function (statement, callback) {
                             connection.release();
                         }
                         // write the error log
-                        errorLog({code: err.code, name: err.toString(), message: err.message}, 'Mysql Exception');
+                        mysqlErrorLog({code: err.code, name: err.toString(), message: err.message}, 'Mysql Exception');
                         callback(err, null);
                     }
                 });
             }
         });
     } catch (e) {
-        callback(e.toString(), null);
-        errorLog(e, 'Mysql UncaughtException');
+        mysqlErrorLog({},e.stack);
+        callback(e.toString(), null);        
     }
 };
 getDeviceInfo = function (UserAgent) {

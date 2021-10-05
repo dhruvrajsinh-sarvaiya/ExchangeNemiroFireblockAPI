@@ -1,6 +1,7 @@
 const jwtHelper = require("./JWT");
 let mySql = require('./apiHelper').query;
 let dot = require('dot-object');
+let errorLog = require('./logHelper').errorLog;
 let responseCode = require('../helper/responseCodes'),
      CodeHandler = new responseCode();
 
@@ -47,7 +48,8 @@ validateJWTToken = async function (headers, callback) {
 
 validateBasicToken = async function (headers,siteID,callback){
     try{
-        mySql("SELECT sitename,id FROM sitemaster WHERE Btoken = '"+ headers.authorization.split(' ')[1] +"' AND id = "+siteID,async function(err,result){
+        let query ="SELECT sitename,id FROM sitemaster WHERE Btoken = '"+ headers.authorization.split(' ')[1] +"' AND id = "+siteID;
+        mySql(query,async function(err,result){
 
             if(!err && result.length > 0){
                 dot.str("sitename",result[0].sitename,headers);
@@ -57,12 +59,14 @@ validateBasicToken = async function (headers,siteID,callback){
                 })
 
             }else{
+                errorLog({"query":query},err.stack);
                 response = await CodeHandler.getAuthenticationResponseCode("INVALID_TOKEN")
                 callback(401, false, response);
             }
 
         });
     }catch(e){
+        errorLog({},e.stack);
         response = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR")
         callback(500, false, response);
     }
@@ -70,17 +74,20 @@ validateBasicToken = async function (headers,siteID,callback){
 
 validateSiteToken = async function (siteData,callback) {
     try {
-        mySql("SELECT id from siteMaster where id = " + siteData.id + " AND sitename = '" + siteData.sitename + "' AND status = 1;", async function (err, result) {
+        let query = "SELECT id from siteMaster where id = " + siteData.id + " AND sitename = '" + siteData.sitename + "' AND status = 1";
+        mySql(query, async function (err, result) {
             if(!err && result.length > 0){
                 validateWhiteListedIPAddress(siteData,function(error,result,data){
                     callback(error,result,data);
                 })
             }else{
+                errorLog({"query":query},err.stack);
                 response = await CodeHandler.getFailedResponseCode("SITE_DETAIL_NOT_FOUND")
                 callback(200, false, response);
             }
         })
     } catch (e) {
+        errorLog({},e.stack);
         response = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR")
         callback(500, false, response);
     }
@@ -88,15 +95,18 @@ validateSiteToken = async function (siteData,callback) {
 
 validateWhiteListedIPAddress = async function (siteData,callback) {
     try {
-        mySql("SELECT allow_ip from whitelist_access_ip where siteId = " + siteData.id + " AND allow_ip = '" + siteData.ip + "' AND status = 1;",async function (err, result) {
+        let query = "SELECT allow_ip from whitelist_access_ip where siteId = " + siteData.id + " AND allow_ip = '" + siteData.ip + "' AND status = 1";
+        mySql(query,async function (err, result) {
             if(!err && result.length > 0){
                 callback(null, true, siteData);
             }else{
+                errorLog({"query":query},err.stack);
                 response = await CodeHandler.getFailedResponseCode("IP_ADDRESS_NOT_WHITELISTED")
                 callback(200, false, response);
             }
         })
     } catch (e) {
+        errorLog({},e.stack);
         response = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR")
         callback(500, false, response);
     }
@@ -105,15 +115,18 @@ validateWhiteListedIPAddress = async function (siteData,callback) {
 findProvider = async function(providerId,siteId,callback){
     try{
         let response;
-        mySql("SELECT p.id,p.providerName,pa.ENCPubKey,pa.EncPvtKey FROM providers p INNER JOIN providerAuthDetails pa ON p.id = pa.providerid WHERE pa.siteId = "+parseInt(siteId)+" AND p.id = "+parseInt(providerId)+" AND p.STATUS = 1 AND pa.status = 1",async function(err,providerList){
+        let query = "SELECT p.id,p.providerName,pa.ENCPubKey,pa.EncPvtKey FROM providers p INNER JOIN providerAuthDetails pa ON p.id = pa.providerid WHERE pa.siteId = "+parseInt(siteId)+" AND p.id = "+parseInt(providerId)+" AND p.STATUS = 1 AND pa.status = 1";
+        mySql(query,async function(err,providerList){
             if(!err && providerList.length > 0){
                 callback(null,true,providerList[0])
             }else {
+                errorLog({"query":query},err.stack);
                 response = await CodeHandler.getFailedResponseCode("PROVIDER_NOT_FOUND");
                 callback(200,false,response)
             }
         })
     }catch (e) {
+        errorLog({},e.stack);
         response = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
         callback(500,false,response)
     }
@@ -323,12 +336,13 @@ checkBlankValue = function (data) {
 
 findMethodDetails = function(data,callback) {
     try{
-        let selectStatement = "SELECT id,methodName,requestParameters,headersParameter,responseParameter FROM providermethodlist WHERE STATUS = 1 AND methodName = '"+ data.method + "' AND providerId = "+data.providerId;
-        mySql(selectStatement,function(err,methodDetails){
+        let query = "SELECT id,methodName,requestParameters,headersParameter,responseParameter FROM providermethodlist WHERE STATUS = 1 AND methodName = '"+ data.method + "' AND providerId = "+data.providerId;
+        mySql(query,function(err,methodDetails){
             if(!err && methodDetails.length > 0){
                 callback(null,true,methodDetails[0]);
             }else{
                 if(err){
+                    errorLog({"query":query},err.stack);
                     callback (err.toString(),false,{})
                 }  else{
                     callback (null,false,{})
@@ -337,18 +351,19 @@ findMethodDetails = function(data,callback) {
             }
         })
     }catch(e){
-
+        errorLog({},e.stack);
     }
 };
 
 findRequestValidationDetails = function(data,callback) {
-    let selectStatement = "SELECT requestParam FROM requestvalidation WHERE STATUS = 1 AND providerId = "+data.providerId+" AND routeid = "+data.routeId;
+    let query = "SELECT requestParam FROM requestvalidation WHERE STATUS = 1 AND providerId = "+data.providerId+" AND routeid = "+data.routeId;
 
-    mySql(selectStatement,function(err,validateParams){
+    mySql(query,function(err,validateParams){
         if(!err && validateParams.length > 0){
             callback (null,true,validateParams[0].requestParam)
         }else {
             if(err){
+                errorLog({"query":query},err.stack);
                 callback (err.toString(),false,{})
             }  else{
                 callback (null,false,{})

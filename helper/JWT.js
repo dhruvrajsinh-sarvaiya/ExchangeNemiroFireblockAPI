@@ -16,7 +16,7 @@ exports.createToken = function (data, callback) {
     } catch (e) {
 
         response.status = 1;
-        response.err = e.toString();
+        response.err = e.stack;
         callback(response);
     }
 };

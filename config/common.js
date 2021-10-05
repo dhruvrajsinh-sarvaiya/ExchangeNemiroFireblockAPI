@@ -20,9 +20,9 @@ module.exports = {
 	},
 	isDDOSEnable: true,
 	DDOSSettings: {
-        burst: 15000,
-        limit: 15000,
-		maxexpiry: 300,
+        burst: 1,
+        limit: 500,
+		maxexpiry: 120,
         trustProxy: true,
         includeUserAgent: true,
         whitelist: [],
