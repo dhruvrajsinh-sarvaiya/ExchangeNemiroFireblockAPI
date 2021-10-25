@@ -122,25 +122,28 @@ module.exports = function (app) {
 
                                         //Provider requestlog
                                         providerRequestLog(requestData.providerName,methodName,methodRequest);  
-                                        
-                                        userProvider[methodName](methodRequest, async function (err, res) {
+                                        try {
+                                            userProvider[methodName](methodRequest, async function (err, res) {
                                             
-                                            if (!err) {
-                                                userProvider = null;                                                
-                                                responseData = await CodeHandler.getSucessResponseCode("SUCESS");
-                                                responseData.data = res;
-                                                //Response log
-                                                responseLog(requestData,responseData);
-                                                return response.status(200).json(responseData).end();
-                                            } else {
-                                                userProvider = null;
-                                                responseData = {};
-                                                responseData.message = err.error;
-                                                responseData.code = 7000;
-                                                responseData.responseCode = 1;
-                                                return response.status(err.statusCode).json(responseData).end();
-                                            }
-                                        })
+                                                if (!err) {
+                                                    userProvider = null;                                                
+                                                    responseData = await CodeHandler.getSucessResponseCode("SUCESS");
+                                                    responseData.data = res;
+                                                    //Response log
+                                                    responseLog(requestData,responseData);
+                                                    return response.status(200).json(responseData).end();
+                                                } else {
+                                                    userProvider = null;
+                                                    responseData = await CodeHandler.getFailedResponseCode("PROVIDER_SDK_ERROR");
+                                                    responseData.message = err.error;                                                
+                                                    return response.status(err.statusCode).json(responseData).end();
+                                                }
+                                            })
+                                        } catch(err) {
+                                            errorLog({},err.stack);
+                                            responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
+                                            response.status(200).json(responseData).end();
+                                        }                                        
                                     }else{
                                         // Internal Error Return
                                         responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
@@ -174,23 +177,27 @@ module.exports = function (app) {
                                 }
                                 //Provider requestlog
                                 providerRequestLog(requestData.providerName,methodName,methodRequest);
-
-                                userProvider[methodName](methodRequest,async function (err, res) {
-                                    if (!err) {
-                                        userProvider = null;
-                                        responseData = await CodeHandler.getSucessResponseCode("SUCESS");
-                                        responseData.data = res;
-                                        //Response log
-                                        responseLog(requestData,responseData);
-                                        return response.status(200).json(responseData).end();                                        
-                                    } else {
-                                        userProvider = null;
-                                        responseData.message = err.error;
-                                        responseData.code = 7000;
-                                        responseData.responseCode = 1;
-                                        return response.status(err.statusCode).json(responseData).end();                                        
-                                    }
-                                })
+                                try {
+                                    userProvider[methodName](methodRequest,async function (err, res) {
+                                        if (!err) {
+                                            userProvider = null;
+                                            responseData = await CodeHandler.getSucessResponseCode("SUCESS");
+                                            responseData.data = res;
+                                            //Response log
+                                            responseLog(requestData,responseData);
+                                            return response.status(200).json(responseData).end();                                        
+                                        } else {
+                                            userProvider = null;
+                                            responseData = await CodeHandler.getFailedResponseCode("PROVIDER_SDK_ERROR");
+                                            responseData.message = err.error;
+                                            return response.status(err.statusCode).json(responseData).end();                                        
+                                        }
+                                    })
+                                } catch(err) {
+                                    errorLog({},err.stack);
+                                    responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
+                                    response.status(200).json(responseData).end();                                    
+                                }                                
                             }else{
                                 // Internal Error Return
                                 responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");

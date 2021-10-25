@@ -370,8 +370,8 @@ module.exports = class FireBlockAPI {
         })
     }
 
-    getTransactionList(reqeust, callback) {
-        this.fireBlockSDK.getTransactions(reqeust).then(transactionList => {
+    getTransactionList(request, callback) {
+        this.fireBlockSDK.getTransactions(request).then(transactionList => {
             callback(null, transactionList)
         }).catch(error => {
             let errorInfo = {
@@ -484,6 +484,24 @@ module.exports = class FireBlockAPI {
             providerErrorLog("fireblocks","createTransaction",{},JSON.stringify(errorInfo));
             callback(errorInfo);
         })
+    }
+
+    getDepoistTransactionList(request,callback) {
+        let paginationURL = "";
+        if(typeof request.pageurl != undefined && request.pageurl != "")
+        {
+            paginationURL = request.pageurl;
+        }
+        this.fireBlockSDK.getTransactionsWithPageInfo(request,paginationURL).then(transactionList => {
+            callback(null, transactionList)
+        }).catch(error => {
+            let errorInfo = {
+                statusCode : error.statusCode,
+                error : error.error
+            };            
+            providerErrorLog("fireblocks","getDepoistTransactionList",{},JSON.stringify(errorInfo));
+            callback(errorInfo);
+        });        
     }
 }
 
