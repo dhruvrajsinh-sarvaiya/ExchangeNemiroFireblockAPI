@@ -8,7 +8,7 @@ const path = require('path'),
     helmet = require('helmet');
 
 const app = express();
-app.use(logger('dev'))
+//app.use(logger('dev'))
 app.use(helmet())
 app.use(bodyParser.json({limit: '50mb'}))
 app.use(bodyParser.urlencoded({ extended: true }));

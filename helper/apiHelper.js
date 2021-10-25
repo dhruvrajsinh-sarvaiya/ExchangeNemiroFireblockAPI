@@ -1,8 +1,9 @@
 const pool = require("../config/keys").pool;
 const parser = require("ua-parser-js"),
-      mysqlErrorLog = require('./logHelper').mysqlErrorLog;
+      mysqlErrorLog = require('./logHelper').mysqlErrorLog,
+      errorLog = require('./logHelper').errorLog;
 let dot = require('dot-object');
-query = function (statement, callback) {
+var query = function (statement, callback) {
     try {
         pool.getConnection(function (err, connection) {
             if (err) {
@@ -55,12 +56,9 @@ getDeviceInfo = function (UserAgent) {
 
 MakeRequest = async function (RequestParam, requestKey, requestBody, PerentRequestObject) {
     try {
-        console.log(requestKey)
         if (RequestParam.value == '' && RequestParam.defaultValue !== "") {
             dot.str(requestKey, RequestParam.defaultValue, PerentRequestObject);
         } else {
-            console.log("Value : ", RequestParam.value);
-            console.log("PerentRequestObject : ", PerentRequestObject);
             let pick = dot.pick(RequestParam.value, requestBody);
             if ((typeof pick === "undefined" || pick === "") && typeof RequestParam.defaultValue !== "undefined" && RequestParam.defaultValue === "null") {
                 dot.str(requestKey, "", PerentRequestObject);
@@ -120,9 +118,140 @@ async function getMapping(mappingDetails, callback) {
     }
 }
 
+storeVaultData = function (data, callback) {
+    try {
+        if(data && typeof data.id != "undefined" && typeof data.name != "undefined" && data.id && data.name)
+        {
+            let queryString = "insert into vaultdetail set vault_id="+data.id+",name='"+data.name+"',data='"+JSON.stringify(data)+"'";
+            
+            query(queryString, async function (err, result) {
+                
+                if (!err && result) {
+                    callback(null,result);
+                } else {
+                    errorLog({"query":query},err.stack);
+                    callback(err.toString());
+                }
+            });
+        } else {            
+            callback("Invalid data");
+        }
+    } catch(err) {
+        errorLog({"Exception":"SQL"},err.stack);
+        callback(err.toString());
+    }    
+};
+
+storeVaultToAssetMap = function (data, callback) {
+    try { 
+        if(data && typeof data.vaultID != "undefined" && typeof data.assetId != "undefined" && data.vaultID && data.assetId)
+        {
+            let selectStatement = "select count(id) As id from vaultdetail where vault_id="+data.vaultID;
+            query(selectStatement, async function (err, result) {
+                
+                if (!err && result && result[0].id > 0) {
+                    let queryString = "insert into vaulttoasset set vault_id="+data.vaultID+",assetId='"+data.assetId+"',data='"+JSON.stringify(data.assetDetails)+"'"
+                    
+                    query(queryString, async function (err, result) {
+                        
+                        if (!err && result) {
+                            callback(null,result);
+                        } else {
+                            errorLog({"query":query},err.stack);
+                            callback(err.toString());
+                        }
+                    });
+                } else if (!err && result && result[0].id == 0) {
+                    callback("Provide valid vault "+data.vaultID);                         
+                } else {
+                    errorLog({"query":query},err.stack);
+                    callback(err.toString());
+                }
+            });
+        } else {            
+            callback("Invalid data");
+        }
+    } catch(err) {
+        errorLog({"Exception":"SQL"},err.stack);
+        callback(err.toString());
+    }    
+};
+
+storeInternalWalletData = function (data, callback) {
+    try {
+        if(data && typeof data.id != "undefined" && typeof data.name != "undefined" && data.id && data.name)
+        {
+            let queryString = "insert into internalwallet set wallet_id='"+data.id+"',name='"+data.name+"',data='"+JSON.stringify(data)+"'";
+            
+            query(queryString, async function (err, result) {
+                
+                if (!err && result) {
+                    callback(null,result);
+                } else {
+                    errorLog({"query":query},err.stack);
+                    callback(err.toString());
+                }
+            });
+        } else {            
+            callback("Invalid data");
+        }
+    } catch(err) {
+        errorLog({"Exception":"SQL"},err.stack);
+        callback(err.toString());
+    }    
+};
+
+storeExternalWalletData = function (data, callback) {
+    try {
+        if(data && typeof data.id != "undefined" && typeof data.name != "undefined" && data.id && data.name)
+        {
+            let queryString = "insert into externalwallet set wallet_id='"+data.id+"',name='"+data.name+"',data='"+JSON.stringify(data)+"'";
+            
+            query(queryString, async function (err, result) {
+                
+                if (!err && result) {
+                    callback(null,result);
+                } else {
+                    errorLog({"query":query},err.stack);
+                    callback(err.toString());
+                }
+            });
+        } else {            
+            callback("Invalid data");
+        }
+    } catch(err) {
+        errorLog({"Exception":"SQL"},err.stack);
+        callback(err.toString());
+    }    
+};
+
+storeWithdrawTransactionData = function (request,response, callback) {
+    try {     
+        let queryString = "insert into transaction_log set assetId='"+request.assetId+"',sourceId='"+request.source.id+"',sourceType='"+request.source.type+"',amount='"+request.amount+"',txn_id='"+response.id+"',request='"+JSON.stringify(request)+"',response='"+JSON.stringify(response)+"'";
+        
+        query(queryString, async function (err, result) {
+            
+            if (!err && result) {
+                callback(null,result);
+            } else {
+                errorLog({"query":query},err.stack);
+                callback(err.toString());
+            }
+        });        
+    } catch(err) {
+        errorLog({"Exception":"SQL"},err.stack);
+        callback(err.toString());
+    }    
+};
+
 module.exports = {
     query: query,
     getDeviceInfo: getDeviceInfo,
     MakeRequest: MakeRequest,
     getMapping: getMapping,
+    storeVaultData: storeVaultData,
+    storeVaultToAssetMap: storeVaultToAssetMap,
+    storeInternalWalletData: storeInternalWalletData,
+    storeExternalWalletData: storeExternalWalletData,
+    storeWithdrawTransactionData: storeWithdrawTransactionData
 }

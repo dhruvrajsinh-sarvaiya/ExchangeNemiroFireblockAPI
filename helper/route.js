@@ -23,6 +23,8 @@ provider.push({
 module.exports = function (app) {
     app.all('/*', async function (request, response, next) {
         try {
+            CodeHandler = new responseCode();
+
             if (request.headers['x-forwarded-for']) {
                 request.headers.ip = request.headers['x-forwarded-for'].split(":")[0];
             } else if (request.connection && request.connection.remoteAddress) {
@@ -69,6 +71,7 @@ module.exports = function (app) {
 
     app.post("/api/:methodName", function (request, response) {
         var requestData = {},
+            responseData = {},
             method;
         requestData.body = request.body;
         requestData.method = request.params.methodName;
@@ -110,43 +113,47 @@ module.exports = function (app) {
                                             });
                                         }
 
-                                        if (typeof requestMapping.headersParam != 'undefined' && Object.keys(requestMapping.headersParam).length > 0) {
+                                        // Need to remove as not required
+                                        /* if (typeof requestMapping.headersParam != 'undefined' && Object.keys(requestMapping.headersParam).length > 0) {
                                             await Object.keys(requestMapping.headersParam).forEach(function (key) {
                                                 MakeRequest(requestMapping.headersParam[key], key, data, options.headers)
                                             });
-                                        }
+                                        } */
 
                                         //Provider requestlog
                                         providerRequestLog(requestData.providerName,methodName,methodRequest);  
-
-                                        userProvider[methodName](methodRequest,function (err, res) {
+                                        
+                                        userProvider[methodName](methodRequest, async function (err, res) {
+                                            
                                             if (!err) {
-                                                userProvider = null;
-
+                                                userProvider = null;                                                
+                                                responseData = await CodeHandler.getSucessResponseCode("SUCESS");
+                                                responseData.data = res;
                                                 //Response log
-                                                responseLog(requestData,res);
-                                                return response.status(200).json(res).end();
+                                                responseLog(requestData,responseData);
+                                                return response.status(200).json(responseData).end();
                                             } else {
                                                 userProvider = null;
-
-                                                //Error log
-                                                errorLog(requestData,err);
-                                                return response.status(200).json({msg: err.toString()}).end();
+                                                responseData = {};
+                                                responseData.message = err.error;
+                                                responseData.code = 7000;
+                                                responseData.responseCode = 1;
+                                                return response.status(err.statusCode).json(responseData).end();
                                             }
                                         })
                                     }else{
                                         // Internal Error Return
-                                        let responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
+                                        responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
                                         response.status(200).json(responseData).end();
                                     }
                                 })
                             } else {
-                                let resInfo = {
+                                responseData = {
                                     responseCode: 1,
-                                    errCode: validateResultDetails.errorCode,
+                                    code: validateResultDetails.errorCode,
                                     message: validateResultDetails.message,
                                 }
-                                response.status(200).json(resInfo).end();
+                                response.status(200).json(responseData).end();
                             }
                         })
 
@@ -168,24 +175,25 @@ module.exports = function (app) {
                                 //Provider requestlog
                                 providerRequestLog(requestData.providerName,methodName,methodRequest);
 
-                                userProvider[methodName](methodRequest,function (err, res) {
+                                userProvider[methodName](methodRequest,async function (err, res) {
                                     if (!err) {
                                         userProvider = null;
-
+                                        responseData = await CodeHandler.getSucessResponseCode("SUCESS");
+                                        responseData.data = res;
                                         //Response log
-                                        responseLog(requestData,res);
-                                        return response.status(200).json(res).end();
+                                        responseLog(requestData,responseData);
+                                        return response.status(200).json(responseData).end();                                        
                                     } else {
                                         userProvider = null;
-
-                                        //Error log
-                                        errorLog(requestData,err);
-                                        return response.status(200).json({msg: err.toString()}).end();
+                                        responseData.message = err.error;
+                                        responseData.code = 7000;
+                                        responseData.responseCode = 1;
+                                        return response.status(err.statusCode).json(responseData).end();                                        
                                     }
                                 })
                             }else{
                                 // Internal Error Return
-                                let responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
+                                responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
                                 response.status(200).json(responseData).end();
                             }
                         })
@@ -194,25 +202,26 @@ module.exports = function (app) {
                 })
             } else {
                 // Return method not found
-                let responseData = await CodeHandler.getFailedResponseCode("METHOD_NOT_FOUND");
+                responseData = await CodeHandler.getFailedResponseCode("METHOD_NOT_FOUND");
                 response.status(200).json(responseData).end();
             }
         });
     });
 
-    app.post('/generateAccessToken', async function (req, res) {
-        let response = {};
+    app.post('/generateAccessToken', async function (request, response) {
+        
+        let responseData = {};
         try {
 
-            let body = req.body;
+            let body = request.body;
             let query = "SELECT id,providerId,siteAccessToken,sitename from siteMaster where id = " + body.site_id + " AND sitename = '" + body.SiteName + "' AND status = 1";
             // find site details from site id and site name
             mySql(query, async function (err, result) {
                 if (!err) {
                     // generate token if site found
                     let data = {
-                        ip: req.headers.ip,
-                        deviceInfo: req.headers.deviceInfo,
+                        ip: request.headers.ip,
+                        deviceInfo: request.headers.deviceInfo,
                         id: result[0].id,
                         providerId: result[0].providerId,
                         siteAccessToken: result[0].siteAccessToken,
@@ -221,26 +230,26 @@ module.exports = function (app) {
                     jwtHelper.createToken(data, async function (error, token) {
                         if (!error && token.status === 0) {
 
-                            response = await CodeHandler.getSucessResponseCode("SUCESS");
-                            dot.str('data.token', token.token, response)
-                            res.status(200).json(response).end();
+                            responseData = await CodeHandler.getSucessResponseCode("SUCESS");
+                            dot.str('data.token', token.token, responseData)
+                            response.status(200).json(responseData).end();
 
                         } else if (!error && token.status === 1) {
                             errorLog(data,token.err);
-                            response = await CodeHandler.getFailedResponseCode("TOKEN_GENERATION_FAILED");
-                            res.status(200).json(response).end();
+                            responseData = await CodeHandler.getFailedResponseCode("TOKEN_GENERATION_FAILED");
+                            response.status(200).json(responseData).end();
                         }
                     });
                 } else {
                     errorLog({"query":query},err.stack);
-                    response = await CodeHandler.getFailedResponseCode("TOKEN_GENERATION_FAILED");
-                    res.status(200).json(response).end();
+                    responseData = await CodeHandler.getFailedResponseCode("TOKEN_GENERATION_FAILED");
+                    response.status(200).json(responseData).end();
                 }
             })
         } catch (e) {
             errorLog({},e.stack);
-            response = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
-            res.status(200).json(response).end();
+            responseData = await CodeHandler.getFailedResponseCode("INTERNAL_ERROR");
+            response.status(200).json(responseData).end();
         }
     });
 };
